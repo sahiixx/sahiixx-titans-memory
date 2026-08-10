@@ -1,242 +1,128 @@
-# Titans Memory
+# sahiixx-titans-memory
 
-> **Memory that forgets the boring stuff and keeps what matters.**
->
-> Surprise-weighted persistent memory for AI agents. Based on Google NeurIPS 2025 research.
-
-[![Paper](https://img.shields.io/badge/paper-Titans%20(NeurIPS%202025)-blue)](https://arxiv.org/abs/2501.00663)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://python.org)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
-
----
-
-## The Problem
+![Python](https://img.shields.io/badge/python-3.11+-blue) ![Agentic](https://img.shields.io/badge/agentic-harness-purple)
 
 AI agents remember **everything** or **nothing**.
 
-- **Flat memory** (log files, conversation history) grows forever and drowns signal in noise.
-- **No memory** (default Claude Code / Codex) means every session starts from scratch.
-- `claude-memory-compiler` captures everything via hooks — but *everything* includes routine tasks you'll never need again.
+## Table of Contents
 
-**Titans Memory** fixes this with **surprise-weighted retention**.
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Agentic Architecture](#agentic-architecture)
+- [Model Routing](#model-routing)
+- [Project Layout](#project-layout)
+- [Development](#development)
+- [Related Repositories](#related-repositories)
 
-Routine tasks fade. Unexpected outcomes persist. Your agent learns what matters.
+## Overview
 
----
+AI agents remember **everything** or **nothing**.
 
-## How It Works
-
-Inspired by [Titans: Learning to Memorize at Test Time](https://arxiv.org/abs/2501.00663) (Google, NeurIPS 2025):
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Attention  =  Short-term memory  (precise, limited window) │
-│  Neural     =  Long-term memory   (persistent, learned)     │
-│  Surprise   =  What violates expectations  (memorable)    │
-│  Forgetting =  Weight decay ∝ unsurprisingness            │
-└─────────────────────────────────────────────────────────────┘
-```
-
-Every mission outcome gets a **surprise score** (0.0 = routine, 1.0 = completely unexpected).
-
-- **"Build a REST API" → GO** → surprise = 0.2 → fades in ~5 sessions
-- **"Trading system audit → NO-GO"** → surprise = 0.9 → persists for 50+ sessions
-
-Memory stays compact, signal-rich, and **never grows unbounded**.
-
----
-
-## Install
-
-```bash
-pip install titans-memory
-```
-
-Or from source:
-
-```bash
-git clone https://github.com/sahiixx/titans-memory.git
-cd titans-memory
-pip install -e ".[dev,llm]"
-```
-
----
+| | |
+|---|---|
+| **Stack** | python |
+| **Frameworks** | anthropic, openai |
+| **Tests** | yes |
+| **Commits** | 2 |
+| **Last activity** | 2026-08-10 |
+| **Visibility** | public |
 
 ## Quick Start
 
-### 1. Basic Memory
-
-```python
-from titans_memory import TitansMemory
-
-mem = TitansMemory()
-
-# Record outcomes
-mem.record_outcome("Build auth API", "GO")
-mem.record_outcome("Design landing page", "GO")
-mem.record_outcome("Trading system audit", "NO-GO", surprise_score=0.9)
-
-# See what mattered
-print(mem.summary())
-# Memory: 3 missions | GO: 2 | NO-GO: 1 | avg surprise: 0.53
-
-# Get top memorable outcomes
-for o in mem.get_memorable_outcomes(top_n=3):
-    print(f"  {o.verdict} — {o.mission} (surprise={o.surprise})")
-```
-
-### 2. Auto-Capture from Claude Code
-
-```python
-from titans_memory import HooksMemory
-
-hooks = HooksMemory()
-
-# Watch your .claude/ directory for session files
-sessions = hooks.watch(".claude/")
-print(f"Ingested {len(sessions)} sessions")
-
-# Memory is now surprise-weighted and persistent
-```
-
-### 3. Compile into Knowledge Articles
-
-```python
-from titans_memory import TitansMemory, LLMCompiler
-import anthropic
-
-mem = TitansMemory()
-compiler = LLMCompiler(client=anthropic.Anthropic())
-
-# Turn memorable outcomes into structured knowledge
-outcomes = mem.get_memorable_outcomes(top_n=5)
-article = compiler.compile_article(outcomes)
-
-print(article.to_markdown())
-```
-
----
-
-## Architecture
-
-```
-titans_memory/
-├── core.py       # TitansMemory + MissionOutcome + surprise-weighted decay
-├── hooks.py      # Auto-capture from Claude Code / Codex session files
-└── compilers.py  # LLM-based compiler → structured knowledge articles
-```
-
-| Feature | `claude-memory-compiler` | **Titans Memory** |
-|---|---|---|
-| Auto-capture | ✅ Hooks | ✅ Hooks |
-| Persistent storage | ✅ JSON | ✅ JSON |
-| Surprise weighting | ❌ | ✅ **Google NeurIPS 2025** |
-| Bounded memory | ❌ (grows forever) | ✅ **Auto-pruning** |
-| LLM compiler | ✅ | ✅ |
-| Zero dependencies | ❌ (requires LLM) | ✅ **Core is pure Python** |
-| Works offline | ❌ | ✅ |
-
----
-
-## Comparison: Flat vs. Surprise-Weighted Memory
-
-### Flat Memory (Log Files)
-```
-- Build auth API → GO
-- Fix typo → GO
-- Deploy to staging → GO
-- Fix typo again → GO
-- Design DB schema → GO
-- Build auth API → GO   ← duplicate, already learned
-- Fix typo a third time → GO  ← routine, irrelevant
-```
-**Result:** 7 entries. Noise drowns signal.
-
-### Titans Memory
-```
-- Trading system audit → NO-GO (surprise=0.90, weight=0.90) ← persists
-- Design DB schema → GO (surprise=0.35, weight=0.28)        ← fades slowly
-- Build auth API → GO (surprise=0.20, weight=0.05)          ← pruned
-- Fix typo → GO (surprise=0.10, weight=0.01)                 ← pruned
-```
-**Result:** 2 meaningful entries. Signal intact.
-
----
-
-## Configuration
-
-```python
-from titans_memory import TitansMemory
-
-# Custom hyperparameters
-mem = TitansMemory()
-
-# Or load from custom path
-mem = TitansMemory(ledger_file="/path/to/my/ledger.json")
-```
-
-| Hyperparameter | Default | Description |
-|---|---|---|
-| `SURPRISE_DECAY` | 0.9 | How fast past surprise fades (Titans Eq. 3) |
-| `FORGET_THRESHOLD` | 0.1 | Prune entries below this weight |
-| `MAX_LEDGER_ENTRIES` | 50 | Keep memory compact |
-
----
-
-## CLI
+### Install
 
 ```bash
-# Record an outcome
-titans-memory record "Build auth API" "GO" --surprise 0.3
-
-# Show summary
-titans-memory summary
-
-# Export to markdown
-titans-memory export --top 5 --output lessons.md
-
-# Auto-ingest Claude Code sessions
-titans-memory ingest .claude/
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt   # or: pip install -e .
 ```
 
----
+### Run
 
-## Why This Exists
+```bash
+# Entry point not auto-detected; inspect the layout below.
+```
 
-I run **152 specialized Claude agents** in [`agency-agents`](https://github.com/sahiixx/agency-agents). Every mission produces a verdict (GO / CONDITIONAL GO / NO-GO). Without memory, agents repeat mistakes. With flat memory, they drown in noise.
+## Agentic Architecture
 
-Titans Memory is the solution I built — now packaged for anyone building AI agents.
+This repository participates in the [sahiixx agentic harness](https://github.com/sahiixx/agentic-harness) — a shared
+contract for how agents plan, act, verify, and recover across all repos in this account.
 
----
+**Signal strength:** agentic density score `62` (references to agent,
+tool-call, LLM, RAG and orchestration primitives across the source tree).
 
-## Ecosystem
+### Patterns in play
 
-| Repo | What It Does | Stars |
+| Pattern | Role here |
+|---|---|
+| **Prompt Chaining** | Deterministic multi-step pipelines where subtasks are known upfront |
+| **Routing** | Classify input, dispatch to the specialist path (cheap model for easy work) |
+| **Parallelization** | Independent subtasks fan out; results aggregated programmatically |
+| **Orchestrator–Workers** | Central planner decomposes dynamically when subtasks can't be predicted |
+| **Evaluator–Optimizer** | Generator/judge split with explicit rubric; bounded retry |
+| **ReAct** | Interleaved reason → act → observe for adaptive tool use |
+| **Reflection** | Self-critique before emitting a final answer |
+
+> Escalation rule: start with the simplest pattern that solves the problem. Add
+> Reflection only when verification fails, Planning only when dependencies emerge,
+> Multi-Agent only when work exceeds a single role or context window.
+
+### Reliability envelope
+
+- **Bounded execution** — every loop has a max-iteration and wall-clock ceiling.
+- **Tool sandboxing** — filesystem/network side effects are isolated and reversible.
+- **Guardrail layering** — validate at input, mid-loop, and output.
+- **Context engineering** — select, compress, isolate; never let raw history grow unbounded.
+- **Self-verification** — check intermediate output against constraints before continuing.
+
+## Model Routing
+
+Agent work in this repo routes through Azure AI Foundry. See [`AGENTS.md`](./AGENTS.md)
+for the full contract.
+
+| Purpose | Deployment | Endpoint |
 |---|---|---|
-| [`agency-agents`](https://github.com/sahiixx/agency-agents) | 152-agent Claude swarm | ⭐ 1 |
-| [`sovereign-swarm-v2`](https://github.com/sahiixx/sovereign-swarm-v2) | Modular multi-agent OS | ⭐ 0 |
-| [`goose-aios`](https://github.com/sahiixx/goose-aios) | Local-first AI assistant | ⭐ 0 |
-| [`friday-os`](https://github.com/sahiixx/friday-os) | Voice-first AI OS | ⭐ 0 |
-| [`hermesclaw`](https://github.com/sahiixx/hermesclaw) | Dual Hermes/OpenClaw gateway | ⭐ 1 |
+| Default / general | `gpt-5.6-sol` | `/openai/v1/chat/completions` |
+| Deep reasoning | `claude-opus-5` | `/openai/v1/responses` **only** |
+| Embeddings | `text-embedding-3-small` | `/openai/v1/embeddings` |
 
----
-
-## Citation
-
-```bibtex
-@article{google2025titans,
-  title={Titans: Learning to Memorize at Test Time},
-  author={Google Research},
-  journal={arXiv preprint arXiv:2501.00663},
-  year={2025}
-}
+```bash
+export AZURE_FOUNDRY_API_KEY=...        # never commit this
+export AZURE_FOUNDRY_BASE_URL=https://<resource>.openai.azure.com/openai/v1
 ```
 
+> **Gotcha:** Claude deployments on Azure return `404 api_not_supported` on
+> `/chat/completions`. They answer **only** via the Responses API.
+
+## Project Layout
+
+```
+AGENTS.md
+LICENSE
+README.md
+pyproject.toml
+src/
+tests/
+```
+
+## Development
+
+```bash
+# lint / format before committing
+ruff check . && ruff format .
+
+# run the CI check locally
+gh workflow run hermes-azure-check.yml
+```
+
+Secrets live in environment variables and CI secrets — never in tracked files.
+
+## Related Repositories
+
+Part of a 84-repository workspace sharing one agentic contract:
+
+- **[agentic-harness](https://github.com/sahiixx/agentic-harness)** — patterns, contracts, and reference implementations
+- `AGENTS.md` in every repo pins identical model routing
+
 ---
 
-## License
-
-MIT — see [LICENSE](LICENSE).
-
-> *"The brain remembers what surprised it. So should your agent."*
+<sub>README maintained by the agentic harness · last regenerated 2026-08-10</sub>
